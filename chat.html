@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZivoCam</title>
+
+<style>
+body {
+  background: #0f172a;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-family: Arial;
+}
+
+.container {
+  text-align: center;
+}
+
+video {
+  width: 500px;
+  height: 350px;
+  background: black;
+  border-radius: 15px;
+  border: 3px solid #22c55e;
+}
+
+button {
+  margin-top: 20px;
+  padding: 12px 25px;
+  border: none;
+  background: #22c55e;
+  color: white;
+  border-radius: 10px;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>ZivoCam</h1>
+
+  <video id="video" autoplay playsinline muted></video>
+
+  <br>
+  <button onclick="kamerayiAc()">Kamerayı Aç</button>
+</div>
+
+<script>
+const video = document.getElementById("video");
+
+async function kamerayiAc() {
+  console.log("Butona basıldı");
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false
+    });
+
+    console.log("Stream geldi:", stream);
+
+    video.srcObject = stream;
+
+    // ekstra garanti
+    video.onloadedmetadata = () => {
+      video.play();
+      console.log("Video oynuyor");
+    };
+
+  } catch (err) {
+    console.error("HATA:", err);
+    alert("Kamera açılmadı: " + err.message);
+  }
+}
+</script>
+
+</body>
+</html>

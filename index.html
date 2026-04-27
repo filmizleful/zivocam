@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZivoCam - Canlı Görüntülü Sohbet</title>
+
+<style>
+body{
+  margin:0;
+  font-family: Arial;
+  background: linear-gradient(135deg,#0f172a,#1e293b);
+  color:#fff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+}
+
+.kutu{
+  text-align:center;
+  max-width:400px;
+}
+
+h1{
+  font-size:40px;
+  margin-bottom:10px;
+}
+
+p{
+  opacity:0.8;
+  margin-bottom:30px;
+}
+
+button{
+  background:#ff4d6d;
+  border:none;
+  padding:15px 30px;
+  font-size:18px;
+  border-radius:10px;
+  cursor:pointer;
+  color:#fff;
+}
+
+button:hover{
+  background:#ff2e55;
+}
+</style>
+
+</head>
+<body>
+
+<div class="kutu">
+  <h1>ZivoCam</h1>
+  <p>Rastgele insanlarla görüntülü sohbet et</p>
+
+  <button onclick="basla()">Görüntülü Sohbete Başla</button>
+</div>
+
+<script>
+function basla(){
+  window.location.href = "chat.html";
+}
+</script>
+
+</body>
+</html>

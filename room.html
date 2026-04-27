@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZivoCam Oda</title>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial,sans-serif}
+
+body{
+  background:#0f172a;
+  color:white;
+  min-height:100vh;
+}
+
+header{
+  padding:18px;
+  background:#111827;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid #334155;
+}
+
+header h1{
+  font-size:24px;
+  color:#22c55e;
+}
+
+.oda-panel{
+  max-width:900px;
+  margin:25px auto;
+  background:#111827;
+  padding:20px;
+  border-radius:16px;
+  border:1px solid #334155;
+  text-align:center;
+}
+
+.oda-panel input{
+  padding:12px;
+  margin:8px;
+  width:220px;
+  border:none;
+  border-radius:10px;
+  outline:none;
+}
+
+button{
+  padding:12px 18px;
+  margin:8px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  background:#22c55e;
+  color:white;
+  font-weight:bold;
+}
+
+button:hover{
+  background:#16a34a;
+}
+
+.danger{
+  background:#ef4444;
+}
+
+.danger:hover{
+  background:#dc2626;
+}
+
+.gray{
+  background:#475569;
+}
+
+.gray:hover{
+  background:#334155;
+}
+
+#durum{
+  margin-top:12px;
+  color:#cbd5e1;
+}
+
+#videos{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:18px;
+  padding:25px;
+}
+
+.video-card{
+  background:#111827;
+  border:1px solid #334155;
+  border-radius:16px;
+  padding:12px;
+  position:relative;
+}
+
+.video-card video{
+  width:100%;
+  height:230px;
+  background:#000;
+  border-radius:12px;
+  object-fit:cover;
+}
+
+.video-name{
+  margin-top:8px;
+  color:#e5e7eb;
+  font-size:14px;
+}
+
+.kontrol{
+  text-align:center;
+  margin-bottom:20px;
+}
+
+@media(max-width:600px){
+  header{
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .oda-panel{
+    margin:15px;
+  }
+
+  .oda-panel input{
+    width:90%;
+  }
+
+  #videos{
+    padding:12px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🎥 ZivoCam</h1>
+  <span id="odaBilgi">Oda bekleniyor...</span>
+</header>
+
+<div class="oda-panel">
+  <h2>Odaya Katıl</h2>
+  <p style="margin:10px;color:#cbd5e1;">Aynı oda adını giren herkes birbirini görebilir.</p>
+
+  <input id="kullaniciAdi" placeholder="Adın">
+  <input id="odaAdi" placeholder="Oda adı örn: test123">
+
+  <br>
+
+  <button onclick="odayaKatil()">Odaya Gir</button>
+  <button class="gray" onclick="linkKopyala()">Oda Linkini Kopyala</button>
+
+  <p id="durum">Hazır</p>
+</div>
+
+<div class="kontrol">
+  <button onclick="kameraAcKapat()" id="kameraBtn">Kamera Kapat</button>
+  <button onclick="mikrofonAcKapat()" id="mikrofonBtn">Mikrofon Kapat</button>
+  <button class="danger" onclick="odadanCik()">Odadan Çık</button>
+</div>
+
+<div id="videos"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBmSzMlnTX94BKdUuHDPiVRqwu8of1RqHw",
+  authDomain: "filmizleplusx.firebaseapp.com",
+  projectId: "filmizleplusx",
+  storageBucket: "filmizleplusx.firebasestorage.app",
+  messagingSenderId: "296091084316",
+  appId: "1:296091084316:web:aba2def23f6ce2b03761d9",
+  measurementId: "G-SFQ2RQQH19"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const myId = Math.random().toString(36).substring(2, 12);
+
+let odaId = "";
+let kullaniciAdi = "";
+let localStream = null;
+let peers = {};
+let usersUnsub = null;
+let signalsUnsub = null;
+let joined = false;
+
+const servers = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" }
+  ]
+};
+
+const urlParams = new URLSearchParams(window.location.search);
+const urlOda = urlParams.get("oda");
+
+if(urlOda){
+  document.getElementById("odaAdi").value = urlOda;
+}
+
+function durumYaz(metin){
+  document.getElementById("durum").innerText = metin;
+}
+
+function videoEkle(stream, id, ad, muted=false){
+  if(document.getElementById("card-" + id)) return;
+
+  const card = document.createElement("div");
+  card.className = "video-card";
+  card.id = "card-" + id;
+
+  const video = document.createElement("video");
+  video.srcObject = stream;
+  video.autoplay = true;
+  video.playsInline = true;
+  video.muted = muted;
+
+  const name = document.createElement("div");
+  name.className = "video-name";
+  name.innerText = ad;
+
+  card.appendChild(video);
+  card.appendChild(name);
+
+  document.getElementById("videos").appendChild(card);
+}
+
+async function odayaKatil(){
+  if(joined) return alert("Zaten odaya girdin.");
+
+  kullaniciAdi = document.getElementById("kullaniciAdi").value.trim();
+  odaId = document.getElementById("odaAdi").value.trim();
+
+  if(!kullaniciAdi) return alert("Adını yaz.");
+  if(!odaId) return alert("Oda adı yaz.");
+
+  durumYaz("Kamera açılıyor...");
+
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({
+      video:true,
+      audio:true
+    });
+
+    videoEkle(localStream, myId, kullaniciAdi + " (Sen)", true);
+
+    document.getElementById("odaBilgi").innerText = "Oda: " + odaId;
+
+    const yeniUrl = window.location.pathname + "?oda=" + encodeURIComponent(odaId);
+    window.history.replaceState(null, "", yeniUrl);
+
+    const roomRef = db.collection("rooms").doc(odaId);
+
+    await roomRef.collection("users").doc(myId).set({
+      id: myId,
+      name: kullaniciAdi,
+      joinedAt: Date.now()
+    });
+
+    joined = true;
+    durumYaz("Odaya bağlandın. Diğer kullanıcılar bekleniyor...");
+
+    signalsDinle();
+    usersDinle();
+
+  }catch(err){
+    console.error(err);
+    alert("Kamera açılamadı: " + err.message);
+    durumYaz("Kamera hatası");
+  }
+}
+
+function usersDinle(){
+  const roomRef = db.collection("rooms").doc(odaId);
+
+  usersUnsub = roomRef.collection("users").onSnapshot(snapshot => {
+    snapshot.docChanges().forEach(change => {
+      const user = change.doc.data();
+
+      if(!user || user.id === myId) return;
+
+      if(change.type === "added"){
+        baglantiBaslat(user.id);
+      }
+
+      if(change.type === "removed"){
+        kullaniciKaldir(user.id);
+      }
+    });
+  });
+}
+
+function signalsDinle(){
+  const roomRef = db.collection("rooms").doc(odaId);
+
+  signalsUnsub = roomRef.collection("signals")
+  .where("to", "==", myId)
+  .onSnapshot(snapshot => {
+    snapshot.docChanges().forEach(async change => {
+      const data = change.doc.data();
+
+      if(!data || data.from === myId) return;
+
+      if(data.type === "offer"){
+        await teklifAl(data);
+      }
+
+      if(data.type === "answer"){
+        if(peers[data.from]){
+          await peers[data.from].setRemoteDescription(
+            new RTCSessionDescription(data.answer)
+          );
+        }
+      }
+
+      if(data.type === "candidate"){
+        if(peers[data.from] && data.candidate){
+          try{
+            await peers[data.from].addIceCandidate(
+              new RTCIceCandidate(data.candidate)
+            );
+          }catch(e){
+            console.warn("ICE eklenemedi", e);
+          }
+        }
+      }
+
+      change.doc.ref.delete().catch(()=>{});
+    });
+  });
+}
+
+function yeniPeer(karsiId){
+  const pc = new RTCPeerConnection(servers);
+  peers[karsiId] = pc;
+
+  localStream.getTracks().forEach(track => {
+    pc.addTrack(track, localStream);
+  });
+
+  pc.ontrack = event => {
+    videoEkle(event.streams[0], karsiId, "Katılımcı");
+  };
+
+  pc.onicecandidate = event => {
+    if(event.candidate){
+      db.collection("rooms").doc(odaId).collection("signals").add({
+        type: "candidate",
+        candidate: event.candidate.toJSON(),
+        from: myId,
+        to: karsiId
+      });
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    if(pc.connectionState === "disconnected" || pc.connectionState === "failed" || pc.connectionState === "closed"){
+      kullaniciKaldir(karsiId);
+    }
+  };
+
+  return pc;
+}
+
+async function baglantiBaslat(karsiId){
+  if(peers[karsiId]) return;
+
+  const pc = yeniPeer(karsiId);
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+
+  await db.collection("rooms").doc(odaId).collection("signals").add({
+    type: "offer",
+    offer: offer,
+    from: myId,
+    to: karsiId
+  });
+}
+
+async function teklifAl(data){
+  let pc = peers[data.from];
+
+  if(!pc){
+    pc = yeniPeer(data.from);
+  }
+
+  await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+
+  await db.collection("rooms").doc(odaId).collection("signals").add({
+    type: "answer",
+    answer: answer,
+    from: myId,
+    to: data.from
+  });
+}
+
+function kameraAcKapat(){
+  if(!localStream) return;
+
+  const track = localStream.getVideoTracks()[0];
+  track.enabled = !track.enabled;
+
+  document.getElementById("kameraBtn").innerText =
+    track.enabled ? "Kamera Kapat" : "Kamera Aç";
+}
+
+function mikrofonAcKapat(){
+  if(!localStream) return;
+
+  const track = localStream.getAudioTracks()[0];
+  track.enabled = !track.enabled;
+
+  document.getElementById("mikrofonBtn").innerText =
+    track.enabled ? "Mikrofon Kapat" : "Mikrofon Aç";
+}
+
+function kullaniciKaldir(id){
+  if(peers[id]){
+    peers[id].close();
+    delete peers[id];
+  }
+
+  const card = document.getElementById("card-" + id);
+  if(card) card.remove();
+}
+
+async function odadanCik(){
+  if(!joined){
+    location.reload();
+    return;
+  }
+
+  try{
+    await db.collection("rooms").doc(odaId).collection("users").doc(myId).delete();
+  }catch(e){}
+
+  if(usersUnsub) usersUnsub();
+  if(signalsUnsub) signalsUnsub();
+
+  Object.keys(peers).forEach(id => {
+    peers[id].close();
+  });
+
+  peers = {};
+
+  if(localStream){
+    localStream.getTracks().forEach(track => track.stop());
+  }
+
+  location.reload();
+}
+
+function linkKopyala(){
+  const oda = document.getElementById("odaAdi").value.trim();
+
+  if(!oda) return alert("Önce oda adı yaz.");
+
+  const link = window.location.origin + window.location.pathname + "?oda=" + encodeURIComponent(oda);
+
+  navigator.clipboard.writeText(link)
+  .then(() => alert("Oda linki kopyalandı:\n" + link))
+  .catch(() => alert("Link:\n" + link));
+}
+
+window.addEventListener("beforeunload", () => {
+  if(joined && odaId){
+    db.collection("rooms").doc(odaId).collection("users").doc(myId).delete();
+  }
+});
+</script>
+
+</body>
+</html>
